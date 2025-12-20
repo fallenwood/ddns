@@ -15,6 +15,7 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 
 builder.Services.AddHealthChecks();
 
+// TODO: Auth
 builder.Services.AddAuthentication();
 builder.Services.AddAuthorization();
 
@@ -30,8 +31,8 @@ using (var scope = app.Services.CreateScope())
 
 app.MapHealthChecks("/healthz");
 
-// app.UseAuthentication();
-// app.UseAuthorization();
+app.UseAuthentication();
+app.UseAuthorization();
 
 var apiV1 = app.MapGroup("/api/v1");
 

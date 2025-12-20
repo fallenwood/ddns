@@ -1,0 +1,22 @@
+FROM --platform=linux/arm64 docker.io/arm64v8/alpine:3.23 AS base
+WORKDIR /app
+RUN apk --no-cache --no-interactive add libgcc libstdc++
+
+FROM --platform=linux/amd64 mcr.microsoft.com/dotnet/sdk:10.0-azurelinux3.0-amd64 AS build
+WORKDIR /src
+COPY . .
+RUN dotnet restore "client.csproj"
+WORKDIR "/src"
+RUN dotnet build "client.csproj" -c Release -o /app/build
+
+FROM build AS publish
+RUN dotnet publish "client.csproj" -c Release -o /app/publish /p:UseAppHost=true /p:PublishAot=true -r linux-musl-arm64
+
+FROM base AS final
+WORKDIR /app
+COPY --from=publish /app/publish .
+
+ENV DOTNET_gcServer=1
+ENV DOTNET_GCDynamicAdaptationMode=1
+
+ENTRYPOINT ["./ddns"]

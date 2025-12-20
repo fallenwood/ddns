@@ -5,3 +5,4 @@ cf.http
 **/*.db
 **/*.db-shm
 **/*.db-wal
+**/output
