@@ -1,0 +1,16 @@
+{
+    "configurations": [
+        {
+            "name": "C#: server Debug",
+            "type": "dotnet",
+            "request": "launch",
+            "projectPath": "${workspaceFolder}/server/server.csproj"
+        },
+        {
+            "name": "C#: client Debug",
+            "type": "dotnet",
+            "request": "launch",
+            "projectPath": "${workspaceFolder}/client/client.csproj"
+        }
+    ]
+}

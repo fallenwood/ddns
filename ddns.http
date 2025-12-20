@@ -1,0 +1,20 @@
+@server_HostAddress = http://localhost:5000
+
+POST {{server_HostAddress}}/api/v1/dns-records
+Accept: application/json
+Content-Type: application/json
+
+{
+    "hostname": "myhost.example.com",
+    "type": "AAAA",
+    "content": "::2",
+    "proxied": false,
+    "ttl": 60,
+    "comment": "Created by DDNS client"
+}
+
+###
+
+
+GET {{server_HostAddress}}/api/v1/dns-records/myhost.example.com
+Accept: application/json
