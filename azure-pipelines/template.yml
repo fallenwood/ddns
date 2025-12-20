@@ -23,19 +23,19 @@ jobs:
       script: |
         docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
 
-  # - task: Docker@2
-  #   inputs:
-  #     containerRegistry: 'docker hub'
-  #     repository: 'fallenwood/ddns-server'
-  #     ${{ if eq(parameters.pipelineType, 'Official') }}:
-  #       displayName: 'Docker Build And Push'
-  #       command: 'buildAndPush'
-  #     ${{ if ne(parameters.pipelineType, 'Official') }}:
-  #       displayName: 'Docker Build'
-  #       command: 'build'
-  #     Dockerfile: '**/Dockerfile'
-  #     tags: |
-  #       $(tag)
+  - task: Docker@2
+    inputs:
+      containerRegistry: 'docker hub'
+      repository: 'fallenwood/ddns-server'
+      ${{ if eq(parameters.pipelineType, 'Official') }}:
+        displayName: 'Docker Build And Push'
+        command: 'buildAndPush'
+      ${{ if ne(parameters.pipelineType, 'Official') }}:
+        displayName: 'Docker Build'
+        command: 'build'
+      Dockerfile: '**/Dockerfile'
+      tags: |
+        $(tagArm)
 
   - task: Docker@2
     inputs:
