@@ -101,13 +101,35 @@ if (configuration.GetValue<bool>("DDns:IPAddressProvider:Default:Enabled"))
     });
 }
 
-services.AddSingleton<IIPAddressProvider>(sp =>
+if (configuration.GetValue<bool>("DDns:IPAddressProvider:Default:Enabled"))
 {
-    var config = sp.GetRequiredService<IConfiguration>();
-    var baseUrl = config.GetValue<string>("DDns:IPAddressProvider:Default:BaseUrl") ?? throw new InvalidOperationException("IPAddressProvider:BaseUrl is not configured");
-    var httpClientFactory = sp.GetRequiredService<IHttpClientFactory>();
-    return new IPAddressProvider(baseUrl, httpClientFactory);
-});
+    services.AddSingleton<IIPAddressProvider>(sp =>
+    {
+        var config = sp.GetRequiredService<IConfiguration>();
+        var baseUrl = config.GetValue<string>("DDns:IPAddressProvider:Default:BaseUrl") ?? throw new InvalidOperationException("IPAddressProvider:BaseUrl is not configured");
+        var httpClientFactory = sp.GetRequiredService<IHttpClientFactory>();
+        return new IPAddressProvider(baseUrl, httpClientFactory);
+    });
+}
+else if (configuration.GetValue<bool>("DDns:IPAddressProvider:Cloudflare:Enabled"))
+{
+    services.AddSingleton<IIPAddressProvider>(sp =>
+    {
+        var config = sp.GetRequiredService<IConfiguration>();
+        var httpClientFactory = sp.GetRequiredService<IHttpClientFactory>();
+        return new CfIPAddressProvider(httpClientFactory);
+    });
+}
+else if (configuration.GetValue<bool>("DDns:IPAddressProvider:Echo:Enabled"))
+{
+    services.AddSingleton<IIPAddressProvider>(sp =>
+    {
+        var config = sp.GetRequiredService<IConfiguration>();
+        var baseUrl = config.GetValue<string>("DDns:IPAddressProvider:Echo:BaseUrl") ?? throw new InvalidOperationException("IPAddressProvider:BaseUrl is not configured");
+        var httpClientFactory = sp.GetRequiredService<IHttpClientFactory>();
+        return new EchoIPAddressProvider(baseUrl, httpClientFactory);
+    });
+}
 
 var sp = services.BuildServiceProvider();
 
