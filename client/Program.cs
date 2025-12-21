@@ -164,13 +164,13 @@ while (true)
 
             if (existingRecord?.Content == ipInfo.IPAddress)
             {
-                logger.LogInformation("[ProviderName] No update needed for {hostname} ({type}): {ipAddress}", dnsProvider.Name, hostname, ipInfo.Type, ipInfo.IPAddress);
+                logger.LogInformation("[{ProviderName}] No update needed for {hostname} ({type}): {ipAddress}", dnsProvider.Name, hostname, ipInfo.Type, ipInfo.IPAddress);
                 return;
             }
 
-            logger.LogInformation("[ProviderName]Creating DNS record for {hostname} ({type}): {ipAddress}", dnsProvider.Name, hostname, ipInfo.Type, ipInfo.IPAddress);
+            logger.LogInformation("[{ProviderName}]Creating DNS record for {hostname} ({type}): {ipAddress}", dnsProvider.Name, hostname, ipInfo.Type, ipInfo.IPAddress);
             await dnsProvider.UpsertDnsRecordAsync(existingRecord, hostname, ipInfo.IPAddress, ipInfo.Type, comment: "Created by DDNS client");
-            logger.LogInformation("[ProviderName]DNS record created successfully.", dnsProvider.Name);
+            logger.LogInformation("[{ProviderName}]DNS record created successfully.", dnsProvider.Name);
         });
 
         await Task.WhenAll(tasks);
