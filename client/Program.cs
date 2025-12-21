@@ -142,9 +142,15 @@ var hostname = subDomain + "." + zone;
 
 logger.LogInformation("Starting DDNS client for hostname: {hostname}", hostname);
 
+var initialDelay = 2;
+var exp = 2;
+var maxDelay = 60;
+
+var delay = initialDelay;
+
 while (true)
 {
-    await using var _ = Deferrer.DeferAsync(static async () => await Task.Delay(TimeSpan.FromMinutes(2)));
+    await using var _ = Deferrer.DeferAsync(async () => await Task.Delay(TimeSpan.FromMinutes(delay)));
 
     try
     {
@@ -168,9 +174,12 @@ while (true)
         });
 
         await Task.WhenAll(tasks);
+
+        delay = Math.Min(maxDelay, delay * exp);
     }
     catch (Exception ex)
     {
         logger.LogError(ex, "An error occurred during DNS update.");
+        delay = initialDelay;
     }
 }
