@@ -1,0 +1,11 @@
+FROM --platform=linux/arm64,linux/amd64 docker.io/rust:1.92.0-trixie AS builder
+WORKDIR /src
+COPY . .
+RUN apt update -y && apt install binutils build-essential clang lld -y
+RUN cargo build --release
+
+FROM --platform=linux/arm64,linux/amd64 docker.io/debian:13-slim AS runtime
+WORKDIR /app
+RUN apt update -y && apt install openssl ca-certificates -y
+COPY --from=builder /src/target/release/ddns /app/
+CMD ["/app/ddns"]
