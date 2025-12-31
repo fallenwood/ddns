@@ -33,20 +33,20 @@ jobs:
       ${{ if ne(parameters.pipelineType, 'Official') }}:
         displayName: 'Docker Build'
         command: 'build'
-      Dockerfile: '**/Dockerfile'
+      Dockerfile: '**/Dockerfile.x64'
       tags: |
         $(tag)
 
-  # - task: Docker@2
-  #   inputs:
-  #     containerRegistry: 'docker hub'
-  #     repository: 'fallenwood/ddns-client'
-  #     ${{ if eq(parameters.pipelineType, 'Official') }}:
-  #       displayName: 'Docker Build And Push'
-  #       command: 'buildAndPush'
-  #     ${{ if ne(parameters.pipelineType, 'Official') }}:
-  #       displayName: 'Docker Build'
-  #       command: 'build'
-  #     Dockerfile: '**/Dockerfile.arm64'
-  #     tags: |
-  #       $(tagArm)
+  - task: Docker@2
+    inputs:
+      containerRegistry: 'docker hub'
+      repository: 'fallenwood/ddns-client'
+      ${{ if eq(parameters.pipelineType, 'Official') }}:
+        displayName: 'Docker Build And Push'
+        command: 'buildAndPush'
+      ${{ if ne(parameters.pipelineType, 'Official') }}:
+        displayName: 'Docker Build'
+        command: 'build'
+      Dockerfile: '**/Dockerfile.arm64'
+      tags: |
+        $(tagArm)
