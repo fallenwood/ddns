@@ -40,5 +40,5 @@ pub struct PostOrPutDnsRecordRequest {
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub struct PostOrPutDnsRecordResponse {
     pub success: bool,
-    pub result: Option<DnsRecord>,
+    pub result: DnsRecord,
 }

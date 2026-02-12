@@ -26,9 +26,9 @@ async fn main() {
         tokio::time::sleep(std::time::Duration::from_mins(delay)).await;
 
         let ip_address = get_ipaddress("AAAA".to_string()).await;
-        let current_records = dns_provider.get_dns_records(hostname, "AAAA").await;
+        let current_records = dns_provider.get_dns_records(hostname).await;
 
-        let existing_record = current_records.first();
+        let existing_record = current_records.iter().find(|r| r.r#type == "AAAA");
 
         if let Some(record) = existing_record
             && record.content == ip_address
@@ -43,11 +43,11 @@ async fn main() {
         }
 
         println!(
-            "[DnsProvider] Creating DNS record for {} (AAAA): {}",
+            "[DnsProvider] Updating DNS record for {} (AAAA): {}",
             hostname, ip_address
         );
 
-        dns_provider
+        let result = dns_provider
             .upsert_dns_record(
                 existing_record,
                 hostname,
@@ -57,6 +57,33 @@ async fn main() {
             )
             .await;
 
-        println!("[DnsProvider] DNS record created successfully.");
+        if result.is_some() {
+            println!("[DnsProvider] DNS record updated successfully.");
+        } else if let Some(record_id) = existing_record.map(|r| r.id.clone()) {
+            println!(
+                "[DnsProvider] Update failed, deleting existing record {} and creating new one.",
+                record_id
+            );
+
+            dns_provider.delete_dns_record(&record_id).await;
+
+            let created = dns_provider
+                .upsert_dns_record(
+                    None,
+                    hostname,
+                    &ip_address,
+                    "AAAA",
+                    Some("Created by DDNS client"),
+                )
+                .await;
+
+            if created.is_some() {
+                println!("[DnsProvider] DNS record recreated successfully.");
+            } else {
+                println!("[DnsProvider] Failed to recreate DNS record.");
+            }
+        } else {
+            println!("[DnsProvider] Failed to create DNS record.");
+        }
     }
 }
