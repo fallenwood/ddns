@@ -119,7 +119,7 @@ impl DnsProvider {
         ip_address: &str,
         ip_type: &str,
         comment: Option<&str>,
-    ) -> DnsRecord {
+    ) -> Option<DnsRecord> {
         if self.zone_id.is_none() {
             self.zone_id = self.get_zone_id().await;
         }
@@ -180,9 +180,44 @@ impl DnsProvider {
         let dns_record_response: Result<models::PostOrPutDnsRecordResponse, _> =
             response.json().await;
 
-        let dns_record_response =
-            dns_record_response.expect("[upsert_dns_record] API returned an error");
+        match dns_record_response {
+            Ok(r) if r.success => Some(r.result),
+            _ => None,
+        }
+    }
 
-        return dns_record_response.result;
+    pub async fn delete_dns_record(&mut self, record_id: &str) -> bool {
+        if self.zone_id.is_none() {
+            self.zone_id = self.get_zone_id().await;
+        }
+
+        let zone_id = match &self.zone_id {
+            Some(id) => id,
+            None => {
+                panic!(
+                    "[delete_dns_record] Failed to find Zone ID for zone: {}",
+                    self.zone_name
+                );
+            }
+        };
+
+        let url = format!(
+            "{}/zones/{}/dns_records/{}",
+            CF_BASE_URL, zone_id, record_id
+        );
+
+        let client = reqwest::Client::new();
+        let request = client
+            .delete(&url)
+            .bearer_auth(&self.token)
+            .build()
+            .expect("[delete_dns_record] Failed to build DELETE request");
+
+        let response = client
+            .execute(request)
+            .await
+            .expect("[delete_dns_record] Failed to send request");
+
+        response.status().is_success()
     }
 }
