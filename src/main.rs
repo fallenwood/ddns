@@ -26,9 +26,9 @@ async fn main() {
         tokio::time::sleep(std::time::Duration::from_mins(delay)).await;
 
         let ip_address = get_ipaddress("AAAA".to_string()).await;
-        let current_records = dns_provider.get_dns_records(hostname, "AAAA").await;
+        let current_records = dns_provider.get_dns_records(hostname).await;
 
-        let existing_record = current_records.first();
+        let existing_record = current_records.iter().find(|r| r.r#type == "AAAA");
 
         if let Some(record) = existing_record
             && record.content == ip_address

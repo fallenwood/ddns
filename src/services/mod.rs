@@ -74,7 +74,7 @@ impl DnsProvider {
             .map(|e| e.id);
     }
 
-    pub async fn get_dns_records(&mut self, hostname: &str, record_type: &str) -> Vec<models::DnsRecord> {
+    pub async fn get_dns_records(&mut self, hostname: &str) -> Vec<models::DnsRecord> {
         if self.zone_id.is_none() {
             self.zone_id = self.get_zone_id().await;
         }
@@ -89,7 +89,6 @@ impl DnsProvider {
         let client = reqwest::Client::new();
         let request = client
             .get(&url)
-            .query(&[("name", hostname), ("type", record_type)])
             .bearer_auth(&self.token)
             .build()
             .expect("[get_dns_records] Failed to build request");
@@ -104,7 +103,13 @@ impl DnsProvider {
         let dns_records_response =
             dns_records_response.expect("[get_dns_records] API returned an error");
 
-        return dns_records_response.result;
+        let records: Vec<models::DnsRecord> = dns_records_response
+            .result
+            .into_iter()
+            .filter(|e| e.name == hostname)
+            .collect();
+
+        return records;
     }
 
     pub async fn upsert_dns_record(
