@@ -176,8 +176,10 @@ impl DnsProvider {
             response.json().await;
 
         let dns_record_response =
-            dns_record_response.expect("[upsert_dns_record] API returned an error");
+            dns_record_response.expect("[upsert_dns_record] Failed to decode API response");
 
-        return dns_record_response.result;
+        return dns_record_response.result.expect(
+            "[upsert_dns_record] API returned null result",
+        );
     }
 }
