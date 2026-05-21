@@ -1,6 +1,4 @@
-
-pr:
-- master
+trigger: none
 
 pr:
   branches:
