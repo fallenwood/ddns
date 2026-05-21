@@ -11,6 +11,9 @@ async fn main() {
     let hostname = std::env::var("DDNS_HOSTNAME").expect("DDNS_HOSTNAME not set");
     let zone = std::env::var("DDNS_ZONE").expect("DDNS_ZONE not set");
     let token = std::env::var("DDNS_CLOUDFLARE_TOKEN").expect("DDNS_CLOUDFLARE_TOKEN not set");
+    let cf_proxy = std::env::var("DDNS_CF_PROXY")
+        .ok()
+        .filter(|proxy| !proxy.trim().is_empty());
 
     let hostname = hostname.as_str();
 
@@ -20,7 +23,7 @@ async fn main() {
 
     let mut delay = initial_delay;
 
-    let mut dns_provider = services::DnsProvider::new(zone, token);
+    let mut dns_provider = services::DnsProvider::new(zone, token, cf_proxy);
 
     loop {
         tokio::time::sleep(std::time::Duration::from_mins(delay)).await;
