@@ -37,28 +37,47 @@ pub struct DnsProvider {
     zone_name: String,
     token: String,
     zone_id: Option<String>,
+    client: reqwest::Client,
 }
 
 impl DnsProvider {
-    pub fn new(zone_name: String, token: String) -> Self {
+    pub fn new(zone_name: String, token: String, cf_proxy: Option<String>) -> Self {
+        let mut client_builder = reqwest::Client::builder();
+
+        if let Some(proxy) = cf_proxy
+            .as_deref()
+            .map(str::trim)
+            .filter(|proxy| !proxy.is_empty())
+        {
+            client_builder = client_builder.proxy(
+                reqwest::Proxy::all(proxy).expect("[DnsProvider] Invalid DDNS_CF_PROXY value"),
+            );
+        }
+
+        let client = client_builder
+            .build()
+            .expect("[DnsProvider] Failed to build Cloudflare HTTP client");
+
         DnsProvider {
             zone_name,
             token,
             zone_id: None,
+            client,
         }
     }
 
     async fn get_zone_id(&mut self) -> Option<String> {
         let url = format!("{}/zones", CF_BASE_URL);
 
-        let client = reqwest::Client::new();
-        let request = client
+        let request = self
+            .client
             .get(&url)
             .bearer_auth(&self.token)
             .build()
             .expect("[get_zone_id] Failed to build request");
 
-        let response = client
+        let response = self
+            .client
             .execute(request)
             .await
             .expect("[get_zone_id] Failed to send request");
@@ -86,14 +105,15 @@ impl DnsProvider {
 
         let url = format!("{}/zones/{}/dns_records", CF_BASE_URL, zone_id);
 
-        let client = reqwest::Client::new();
-        let request = client
+        let request = self
+            .client
             .get(&url)
             .bearer_auth(&self.token)
             .build()
             .expect("[get_dns_records] Failed to build request");
 
-        let response = client
+        let response = self
+            .client
             .execute(request)
             .await
             .expect("[get_dns_records] Failed to send request");
@@ -134,11 +154,9 @@ impl DnsProvider {
             }
         };
 
-        let client = reqwest::Client::new();
-
         let request = if record.is_none() {
             let url = format!("{}/zones/{}/dns_records", CF_BASE_URL, zone_id);
-            client
+            self.client
                 .post(&url)
                 .bearer_auth(&self.token)
                 .json(&models::PostOrPutDnsRecordRequest {
@@ -157,7 +175,7 @@ impl DnsProvider {
                 "{}/zones/{}/dns_records/{}",
                 CF_BASE_URL, zone_id, record.id
             );
-            client
+            self.client
                 .put(&url)
                 .bearer_auth(&self.token)
                 .json(&models::PostOrPutDnsRecordRequest {
@@ -172,7 +190,8 @@ impl DnsProvider {
                 .expect("[upsert_dns_record] Failed to build PUT request")
         };
 
-        let response = client
+        let response = self
+            .client
             .execute(request)
             .await
             .expect("[upsert_dns_record] Failed to send request");
@@ -206,14 +225,15 @@ impl DnsProvider {
             CF_BASE_URL, zone_id, record_id
         );
 
-        let client = reqwest::Client::new();
-        let request = client
+        let request = self
+            .client
             .delete(&url)
             .bearer_auth(&self.token)
             .build()
             .expect("[delete_dns_record] Failed to build DELETE request");
 
-        let response = client
+        let response = self
+            .client
             .execute(request)
             .await
             .expect("[delete_dns_record] Failed to send request");

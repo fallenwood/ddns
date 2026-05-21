@@ -1,7 +1,9 @@
-pr:
-- master
-
 trigger: none
+
+pr:
+  branches:
+    include:
+      - master
 
 extends:
   template: template.yml
