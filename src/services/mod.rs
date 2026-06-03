@@ -132,9 +132,8 @@ impl DnsProvider {
         return records;
     }
 
-    pub async fn upsert_dns_record(
+    pub async fn create_dns_record(
         &mut self,
-        record: Option<&models::DnsRecord>,
         host_name: &str,
         ip_address: &str,
         ip_type: &str,
@@ -148,53 +147,89 @@ impl DnsProvider {
             Some(id) => id,
             None => {
                 panic!(
-                    "[upsert_dns_record] Failed to find Zone ID for zone: {}",
+                    "[create_dns_record] Failed to find Zone ID for zone: {}",
                     self.zone_name
                 );
             }
         };
 
-        let request = if record.is_none() {
-            let url = format!("{}/zones/{}/dns_records", CF_BASE_URL, zone_id);
-            self.client
-                .post(&url)
-                .bearer_auth(&self.token)
-                .json(&models::PostOrPutDnsRecordRequest {
-                    name: host_name.to_string(),
-                    r#type: ip_type.to_string(),
-                    content: ip_address.to_string(),
-                    proxied: false,
-                    ttl: 60,
-                    comment: comment.map(|c| c.to_string()),
-                })
-                .build()
-                .expect("[upsert_dns_record] Failed to build POST request")
-        } else {
-            let record = record.unwrap();
-            let url = format!(
-                "{}/zones/{}/dns_records/{}",
-                CF_BASE_URL, zone_id, record.id
-            );
-            self.client
-                .put(&url)
-                .bearer_auth(&self.token)
-                .json(&models::PostOrPutDnsRecordRequest {
-                    name: host_name.to_string(),
-                    r#type: ip_type.to_string(),
-                    content: ip_address.to_string(),
-                    proxied: false,
-                    ttl: 60,
-                    comment: comment.map(|c| c.to_string()),
-                })
-                .build()
-                .expect("[upsert_dns_record] Failed to build PUT request")
-        };
+        let url = format!("{}/zones/{}/dns_records", CF_BASE_URL, zone_id);
+        let request = self
+            .client
+            .post(&url)
+            .bearer_auth(&self.token)
+            .json(&models::PostOrPutDnsRecordRequest {
+                name: host_name.to_string(),
+                r#type: ip_type.to_string(),
+                content: ip_address.to_string(),
+                proxied: false,
+                ttl: 60,
+                comment: comment.map(|c| c.to_string()),
+            })
+            .build()
+            .expect("[create_dns_record] Failed to build POST request");
 
         let response = self
             .client
             .execute(request)
             .await
-            .expect("[upsert_dns_record] Failed to send request");
+            .expect("[create_dns_record] Failed to send request");
+
+        let dns_record_response: Result<models::PostOrPutDnsRecordResponse, _> =
+            response.json().await;
+
+        match dns_record_response {
+            Ok(r) if r.success => Some(r.result),
+            _ => None,
+        }
+    }
+
+    pub async fn update_dns_record(
+        &mut self,
+        record_id: &str,
+        host_name: &str,
+        ip_address: &str,
+        ip_type: &str,
+        comment: Option<&str>,
+    ) -> Option<DnsRecord> {
+        if self.zone_id.is_none() {
+            self.zone_id = self.get_zone_id().await;
+        }
+
+        let zone_id = match &self.zone_id {
+            Some(id) => id,
+            None => {
+                panic!(
+                    "[update_dns_record] Failed to find Zone ID for zone: {}",
+                    self.zone_name
+                );
+            }
+        };
+
+        let url = format!(
+            "{}/zones/{}/dns_records/{}",
+            CF_BASE_URL, zone_id, record_id
+        );
+        let request = self
+            .client
+            .put(&url)
+            .bearer_auth(&self.token)
+            .json(&models::PostOrPutDnsRecordRequest {
+                name: host_name.to_string(),
+                r#type: ip_type.to_string(),
+                content: ip_address.to_string(),
+                proxied: false,
+                ttl: 60,
+                comment: comment.map(|c| c.to_string()),
+            })
+            .build()
+            .expect("[update_dns_record] Failed to build PUT request");
+
+        let response = self
+            .client
+            .execute(request)
+            .await
+            .expect("[update_dns_record] Failed to send request");
 
         let dns_record_response: Result<models::PostOrPutDnsRecordResponse, _> =
             response.json().await;

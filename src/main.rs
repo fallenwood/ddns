@@ -31,10 +31,19 @@ async fn main() {
         let ip_address = get_ipaddress("AAAA".to_string()).await;
         let current_records = dns_provider.get_dns_records(hostname).await;
 
-        let existing_record = current_records.iter().find(|r| r.r#type == "AAAA");
+        let aaaa_records: Vec<_> = current_records
+            .iter()
+            .filter(|record| record.r#type == "AAAA")
+            .collect();
+        let selected_record = aaaa_records
+            .iter()
+            .copied()
+            .find(|record| record.content == ip_address)
+            .or_else(|| aaaa_records.first().copied());
 
-        if let Some(record) = existing_record
+        if let Some(record) = selected_record
             && record.content == ip_address
+            && aaaa_records.len() == 1
         {
             println!(
                 "[DnsProvider] No update needed for {} (AAAA): {}",
@@ -50,43 +59,74 @@ async fn main() {
             hostname, ip_address
         );
 
-        let result = dns_provider
-            .upsert_dns_record(
-                existing_record,
-                hostname,
-                &ip_address,
-                "AAAA",
-                Some("Created by DDNS client"),
-            )
-            .await;
-
-        if result.is_some() {
-            println!("[DnsProvider] DNS record updated successfully.");
-        } else if let Some(record_id) = existing_record.map(|r| r.id.clone()) {
-            println!(
-                "[DnsProvider] Update failed, deleting existing record {} and creating new one.",
-                record_id
-            );
-
-            dns_provider.delete_dns_record(&record_id).await;
-
-            let created = dns_provider
-                .upsert_dns_record(
-                    None,
+        let active_record_id = match selected_record {
+            Some(record) if record.content == ip_address => {
+                println!(
+                    "[DnsProvider] Existing DNS record {} already has the target IP.",
+                    record.id
+                );
+                Some(record.id.clone())
+            }
+            Some(record) => {
+                println!("[DnsProvider] Updating existing DNS record {}.", record.id);
+                dns_provider
+                    .update_dns_record(
+                        &record.id,
+                        hostname,
+                        &ip_address,
+                        "AAAA",
+                        Some("Created by DDNS client"),
+                    )
+                    .await
+                    .map(|record| record.id)
+            }
+            None => dns_provider
+                .create_dns_record(
                     hostname,
                     &ip_address,
                     "AAAA",
                     Some("Created by DDNS client"),
                 )
-                .await;
+                .await
+                .map(|record| record.id),
+        };
 
-            if created.is_some() {
-                println!("[DnsProvider] DNS record recreated successfully.");
-            } else {
-                println!("[DnsProvider] Failed to recreate DNS record.");
+        let Some(active_record_id) = active_record_id else {
+            println!("[DnsProvider] Failed to update DNS record.");
+            continue;
+        };
+
+        let duplicate_record_ids: Vec<_> = aaaa_records
+            .iter()
+            .filter(|record| record.id != active_record_id)
+            .map(|record| record.id.clone())
+            .collect();
+
+        let duplicate_record_count = duplicate_record_ids.len();
+        let mut failed_duplicate_delete_count = 0;
+
+        for record_id in duplicate_record_ids {
+            println!("[DnsProvider] Deleting duplicate DNS record {}.", record_id);
+
+            if !dns_provider.delete_dns_record(&record_id).await {
+                failed_duplicate_delete_count += 1;
+                println!(
+                    "[DnsProvider] Failed to delete duplicate DNS record {}.",
+                    record_id
+                );
             }
+        }
+
+        if failed_duplicate_delete_count == 0 {
+            println!(
+                "[DnsProvider] DNS record updated successfully: {}.",
+                active_record_id
+            );
         } else {
-            println!("[DnsProvider] Failed to create DNS record.");
+            println!(
+                "[DnsProvider] DNS record {} is active, but failed to delete {}/{} duplicate record(s).",
+                active_record_id, failed_duplicate_delete_count, duplicate_record_count
+            );
         }
     }
 }
