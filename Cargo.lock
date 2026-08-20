@@ -71,6 +71,7 @@ dependencies = [
  "mimalloc",
  "reqwest",
  "serde",
+ "serde_json",
  "tokio",
 ]
 

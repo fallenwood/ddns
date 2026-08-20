@@ -231,12 +231,51 @@ impl DnsProvider {
             .await
             .expect("[update_dns_record] Failed to send request");
 
+        let response_status = response.status();
+        let response_body = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "<failed to read response body>".to_string());
+
         let dns_record_response: Result<models::PostOrPutDnsRecordResponse, _> =
-            response.json().await;
+            serde_json::from_str(&response_body);
+        let response_json = serde_json::from_str::<serde_json::Value>(&response_body).ok();
+        let errors = response_json
+            .as_ref()
+            .and_then(|value| value.get("errors"))
+            .cloned()
+            .unwrap_or(serde_json::Value::Null);
 
         match dns_record_response {
             Ok(r) if r.success => Some(r.result),
-            _ => None,
+            Ok(_) => {
+                println!(
+                    "[update_dns_record] Cloudflare API returned success=false while updating zone '{}' record '{}' for host '{}' to '{}' ({}). status={}, errors={}, response_body={}",
+                    self.zone_name,
+                    record_id,
+                    host_name,
+                    ip_address,
+                    ip_type,
+                    response_status,
+                    errors,
+                    response_body
+                );
+                None
+            }
+            Err(err) => {
+                println!(
+                    "[update_dns_record] Failed to parse Cloudflare API response while updating zone '{}' record '{}' for host '{}' to '{}' ({}). status={}, response_body={}, parse_error={}",
+                    self.zone_name,
+                    record_id,
+                    host_name,
+                    ip_address,
+                    ip_type,
+                    response_status,
+                    response_body,
+                    err
+                );
+                None
+            }
         }
     }
 
