@@ -92,7 +92,13 @@ async fn main() {
         };
 
         let Some(active_record_id) = active_record_id else {
-            println!("[DnsProvider] Failed to update DNS record.");
+            println!(
+                "[DnsProvider] Failed to update DNS record for {} (AAAA): {}. Selected record: {:?}. Current AAAA records: {:?}",
+                hostname,
+                ip_address,
+                selected_record,
+                aaaa_records
+            );
             continue;
         };
 
