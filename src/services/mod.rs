@@ -184,101 +184,6 @@ impl DnsProvider {
         }
     }
 
-    pub async fn update_dns_record(
-        &mut self,
-        record_id: &str,
-        host_name: &str,
-        ip_address: &str,
-        ip_type: &str,
-        comment: Option<&str>,
-    ) -> Option<DnsRecord> {
-        if self.zone_id.is_none() {
-            self.zone_id = self.get_zone_id().await;
-        }
-
-        let zone_id = match &self.zone_id {
-            Some(id) => id,
-            None => {
-                panic!(
-                    "[update_dns_record] Failed to find Zone ID for zone: {}",
-                    self.zone_name
-                );
-            }
-        };
-
-        let url = format!(
-            "{}/zones/{}/dns_records/{}",
-            CF_BASE_URL, zone_id, record_id
-        );
-        let request = self
-            .client
-            .put(&url)
-            .bearer_auth(&self.token)
-            .json(&models::PostOrPutDnsRecordRequest {
-                name: host_name.to_string(),
-                r#type: ip_type.to_string(),
-                content: ip_address.to_string(),
-                proxied: false,
-                ttl: 60,
-                comment: comment.map(|c| c.to_string()),
-            })
-            .build()
-            .expect("[update_dns_record] Failed to build PUT request");
-
-        let response = self
-            .client
-            .execute(request)
-            .await
-            .expect("[update_dns_record] Failed to send request");
-
-        let response_status = response.status();
-        let response_body = response
-            .text()
-            .await
-            .unwrap_or_else(|_| "<failed to read response body>".to_string());
-
-        let dns_record_response: Result<models::PostOrPutDnsRecordResponse, _> =
-            serde_json::from_str(&response_body);
-        let response_json = serde_json::from_str::<serde_json::Value>(&response_body).ok();
-        let errors = response_json
-            .as_ref()
-            .and_then(|value| value.get("errors"))
-            .cloned()
-            .unwrap_or(serde_json::Value::Null);
-
-        match dns_record_response {
-            Ok(r) if r.success => Some(r.result),
-            Ok(_) => {
-                println!(
-                    "[update_dns_record] Cloudflare API returned success=false while updating zone '{}' record '{}' for host '{}' to '{}' ({}). status={}, errors={}, response_body={}",
-                    self.zone_name,
-                    record_id,
-                    host_name,
-                    ip_address,
-                    ip_type,
-                    response_status,
-                    errors,
-                    response_body
-                );
-                None
-            }
-            Err(err) => {
-                println!(
-                    "[update_dns_record] Failed to parse Cloudflare API response while updating zone '{}' record '{}' for host '{}' to '{}' ({}). status={}, response_body={}, parse_error={}",
-                    self.zone_name,
-                    record_id,
-                    host_name,
-                    ip_address,
-                    ip_type,
-                    response_status,
-                    response_body,
-                    err
-                );
-                None
-            }
-        }
-    }
-
     pub async fn delete_dns_record(&mut self, record_id: &str) -> bool {
         if self.zone_id.is_none() {
             self.zone_id = self.get_zone_id().await;
@@ -312,6 +217,30 @@ impl DnsProvider {
             .await
             .expect("[delete_dns_record] Failed to send request");
 
-        response.status().is_success()
+        let response_status = response.status();
+        let response_body = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "<failed to read response body>".to_string());
+        let dns_record_response =
+            serde_json::from_str::<models::DeleteDnsRecordResponse>(&response_body);
+
+        match dns_record_response {
+            Ok(response) if response_status.is_success() && response.success => true,
+            Ok(response) => {
+                println!(
+                    "[delete_dns_record] Cloudflare failed to delete zone '{}' record '{}'. status={}, success={}, response_body={}",
+                    self.zone_name, record_id, response_status, response.success, response_body
+                );
+                false
+            }
+            Err(error) => {
+                println!(
+                    "[delete_dns_record] Failed to parse Cloudflare API response while deleting zone '{}' record '{}'. status={}, response_body={}, parse_error={}",
+                    self.zone_name, record_id, response_status, response_body, error
+                );
+                false
+            }
+        }
     }
 }

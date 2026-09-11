@@ -42,3 +42,8 @@ pub struct PostOrPutDnsRecordResponse {
     pub success: bool,
     pub result: DnsRecord,
 }
+
+#[derive(Debug, serde::Deserialize)]
+pub struct DeleteDnsRecordResponse {
+    pub success: bool,
+}
