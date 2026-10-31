@@ -38,6 +38,7 @@ pub struct DnsProvider {
     token: String,
     zone_id: Option<String>,
     client: reqwest::Client,
+    api_base_url: &'static str,
 }
 
 impl DnsProvider {
@@ -63,11 +64,12 @@ impl DnsProvider {
             token,
             zone_id: None,
             client,
+            api_base_url: CF_BASE_URL,
         }
     }
 
     async fn get_zone_id(&mut self) -> Option<String> {
-        let url = format!("{}/zones", CF_BASE_URL);
+        let url = format!("{}/zones", self.api_base_url);
 
         let request = self
             .client
@@ -93,43 +95,60 @@ impl DnsProvider {
             .map(|e| e.id);
     }
 
-    pub async fn get_dns_records(&mut self, hostname: &str) -> Vec<models::DnsRecord> {
+    pub async fn get_dns_records(&mut self, hostname: &str) -> Option<Vec<models::DnsRecord>> {
         if self.zone_id.is_none() {
             self.zone_id = self.get_zone_id().await;
         }
 
         let zone_id = self
             .zone_id
-            .clone()
-            .expect("[get_dns_records] Failed to find Zone ID for zone: {}");
+            .as_deref()
+            .expect("[get_dns_records] Failed to find Zone ID");
+        let url = format!("{}/zones/{}/dns_records", self.api_base_url, zone_id);
+        let mut records = Vec::new();
+        let mut page = 1u32;
 
-        let url = format!("{}/zones/{}/dns_records", CF_BASE_URL, zone_id);
+        loop {
+            let response = match self
+                .client
+                .get(&url)
+                .bearer_auth(&self.token)
+                .query(&[("name.exact", hostname), ("per_page", "100")])
+                .query(&[("page", page)])
+                .send()
+                .await
+                .and_then(reqwest::Response::error_for_status)
+            {
+                Ok(response) => response,
+                Err(error) => {
+                    println!("[get_dns_records] Failed to fetch page {}: {}", page, error);
+                    return None;
+                }
+            };
 
-        let request = self
-            .client
-            .get(&url)
-            .bearer_auth(&self.token)
-            .build()
-            .expect("[get_dns_records] Failed to build request");
+            let response = match response.json::<models::GetDnsRecordsResponse>().await {
+                Ok(response) if response.success => response,
+                result => {
+                    println!(
+                        "[get_dns_records] Invalid or unsuccessful page {}: {:?}",
+                        page, result
+                    );
+                    return None;
+                }
+            };
 
-        let response = self
-            .client
-            .execute(request)
-            .await
-            .expect("[get_dns_records] Failed to send request");
+            records.extend(
+                response
+                    .result
+                    .into_iter()
+                    .filter(|record| record.name.eq_ignore_ascii_case(hostname)),
+            );
 
-        let dns_records_response: Result<models::GetDnsRecordsResponse, _> = response.json().await;
-
-        let dns_records_response =
-            dns_records_response.expect("[get_dns_records] API returned an error");
-
-        let records: Vec<models::DnsRecord> = dns_records_response
-            .result
-            .into_iter()
-            .filter(|e| e.name == hostname)
-            .collect();
-
-        return records;
+            if page >= response.result_info.total_pages {
+                return Some(records);
+            }
+            page += 1;
+        }
     }
 
     pub async fn create_dns_record(
@@ -153,7 +172,7 @@ impl DnsProvider {
             }
         };
 
-        let url = format!("{}/zones/{}/dns_records", CF_BASE_URL, zone_id);
+        let url = format!("{}/zones/{}/dns_records", self.api_base_url, zone_id);
         let request = self
             .client
             .post(&url)
@@ -201,7 +220,7 @@ impl DnsProvider {
 
         let url = format!(
             "{}/zones/{}/dns_records/{}",
-            CF_BASE_URL, zone_id, record_id
+            self.api_base_url, zone_id, record_id
         );
 
         let request = self
@@ -244,3 +263,6 @@ impl DnsProvider {
         }
     }
 }
+
+#[cfg(test)]
+mod tests;

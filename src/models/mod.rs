@@ -25,6 +25,12 @@ pub struct Zone {
 pub struct GetDnsRecordsResponse {
     pub success: bool,
     pub result: Vec<DnsRecord>,
+    pub result_info: DnsRecordsPagination,
+}
+
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
+pub struct DnsRecordsPagination {
+    pub total_pages: u32,
 }
 
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
